@@ -162,7 +162,9 @@ gopathparts = r'''
       | \{[^{}]*\}
      )*
     \}\.                  # struct { ... }.
-  | \$?(?:\w|-|%)+\.      # fun.
+  | \$?(?:\w|-|%)+      # fun.
+    (?:\[(?:[^\]]|\[\])+\])? # optional template params
+    \.                  # . (at the end of fun.)
   | glob\.\.              # glob..
   | \.gobytes\.           # .gobytes.
   | \.dict\.              # .dict.
@@ -180,7 +182,7 @@ golastpart = r'''
             \.?
             (?:
                (?:\w|-|%)+    # regular name
-               (?:\[[^\]+]\])?          # optional template params
+               (?:\[(?:[^\]]|\[\])+\])?          # optional template params
              | \( [^()]* \)   # v1.x go 
             )
             (?:-fm)?)  # name
@@ -218,6 +220,14 @@ gosymre = re.compile(r'''
     '''+golastpart+'''
   )
 $
+''', re.X|re.A)
+
+gotypeassertre = re.compile(r'''
+    .*\.\.typeAssert\.\d+$
+''', re.X|re.A)
+
+gointerfaceswitchre = re.compile(r'''
+    .*\.\.interfaceSwitch\.\d+$
 ''', re.X|re.A)
 
 #print("WOO", gosymre.match("runtime.LockOSThread").groups(), file=sys.stderr)
@@ -291,8 +301,16 @@ with open(sys.argv[1]) as f:
             # c++ type metadata
             typeinfo_sz += sz
             continue
-        if sym.startswith('type..'):
+        if sym.startswith('type:.'):
             # go generated type equality and hash functions
+            gotyp_sz += sz
+            continue
+        if gotypeassertre.match(sym) is not None:
+            # go had some "typeAssert" data
+            gotyp_sz += sz
+            continue
+        if gointerfaceswitchre.match(sym) is not None:
+            # go had some "interfaceSwitch" data
             gotyp_sz += sz
             continue
 
